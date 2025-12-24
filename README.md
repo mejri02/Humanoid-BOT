@@ -1,7 +1,6 @@
-```markdown
-# 🤖 Humanoid Auto BOT
+# 🚀 Humanoid BOT
 
-> Automated solution for Humanoid Network airdrop farming with multi-account support
+> Automated airdrop farming solution for efficient time and multi-account management
 
 [![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -16,52 +15,44 @@
 - [Usage](#usage)
 - [Proxy Recommendation](#proxy-recommendation)
 - [Support](#support)
+- [Contributing](#contributing)
 
 ## 🎯 Overview
 
-Humanoid Auto BOT is an automated tool designed for efficient airdrop farming on the Humanoid Network. It automates account management, task completion, and training submissions across multiple accounts with built-in proxy support.
+Humanoid BOT is an automated tool designed to streamline onchain operations across multiple accounts. It provides seamless integration with Humanoid network and offers robust proxy support for enhanced security and reliability.
 
 **🔗 Get Started:** [Register on Humanoid](https://prelaunch.humanoidnetwork.org/ref/E2YE9U)
 
-> **Important:** Use new EVM wallets for best results.
+> **Important:** Connect new evm wallet.
 
 ## ✨ Features
 
-- 🔐 **Secure Authentication** - Automatic wallet authentication with nonce signing
-- 📊 **Multi-Account Management** - Process multiple accounts in sequence
-- 🌐 **Proxy Support** - HTTP/HTTPS/SOCKS4/SOCKS5 proxy compatibility
-- 🔄 **Smart Proxy Rotation** - Automatic rotation for invalid proxies
-- 🏋️ **Auto Training Submission** - Automatically scrape and submit models/datasets from HuggingFace
-- ✅ **Task Automation** - Complete all available tasks automatically
-- 📈 **Points Tracking** - Real-time points monitoring
-- 🕐 **Scheduled Execution** - 12-hour automatic cycle
+- 🔄 **Automated Account Management** - Retrieve account information automatically
+- 🌐 **Flexible Proxy Support** - Run with or without proxy configuration
+- 🔀 **Smart Proxy Rotation** - Automatic rotation of invalid proxies
+- 💰 **Training Submission** – Automated submit training models and datasets
+- 📥 **Tasks Completion** – Automated complete available tasks
+- 👥 **Multi-Account Support** - Manage multiple accounts simultaneously
 
 ## 📋 Requirements
 
 - **Python:** Version 3.9 or higher
-- **Required Libraries:**
-  - aiohttp
-  - aiohttp-socks
-  - fake-useragent
-  - eth-account
-  - eth-utils
-  - colorama
-  - pytz
+- **Required Libraries:** See `requirements.txt` below
 
 ## 🛠 Installation
 
-### 1. Prepare Your Environment
+### 1. Prepare Your Project Folder
 
-Create a project folder and navigate to it:
+Create a folder for the bot and navigate to it:
 
 ```bash
 mkdir Humanoid-BOT
 cd Humanoid-BOT
-```
+
 
 2. Create Requirements File
 
-Create a file named requirements.txt with the following content:
+Create requirements.txt with the following content:
 
 ```txt
 aiohttp==3.9.1
@@ -83,23 +74,23 @@ pip install -r requirements.txt
 
 Account Setup
 
-Create accounts.txt file and add your wallet private keys (one per line):
+Create accounts.txt in the project directory:
 
 ```
-0xYourPrivateKey1
-0xYourPrivateKey2
-0xYourPrivateKey3
+your_private_key_1
+your_private_key_2
+your_private_key_3
 ```
 
-Proxy Setup (Optional)
+Proxy Configuration (Optional)
 
-Create proxy.txt file and add your proxies:
+Create proxy.txt in the project directory:
 
 ```
 # Simple format
 ip:port
 
-# With protocol
+# With protocol specification
 http://ip:port
 https://ip:port
 socks5://ip:port
@@ -117,57 +108,51 @@ http://username:password@ip:port
 python bot.py
 ```
 
-Bot Workflow
+Runtime Options
 
-When starting the bot:
+When starting the bot, you'll be prompted to choose:
 
-1. Proxy Selection: Choose to run with or without proxies
-2. Account Processing: Each account will be processed sequentially
-3. Automated Tasks:
-   · Account authentication
-   · Training submission (models & datasets)
-   · Task completion
-   · Referral application
-4. Cycle: Automatically repeats every 12 hours
+1. Proxy Mode Selection:
+   · Option 1: Run with proxy
+   · Option 2: Run without proxy
+2. Auto-Rotation:
+   · y: Enable automatic invalid proxy rotation
+   · n: Disable auto-rotation
 
-🔧 Troubleshooting
+Bot Features
 
-Common Issues
+· Automatic Login: Signs messages with wallet private keys
+· Training Submission: Scrapes models/datasets from HuggingFace
+· Task Completion: Automatically completes all available tasks
+· Points Tracking: Shows current points for each account
+· Auto Cycle: Runs every 12 hours automatically
 
-1. "Invalid Private Key" error:
-   · Ensure private keys start with 0x
-   · Verify key format is correct
-2. Proxy connection failures:
-   · Test proxies individually
-   · Ensure proxy format is correct
-   · Check authentication credentials
-3. Import errors:
-   · Verify all requirements are installed
-   · Check Python version (3.9+ required)
+🌐 Proxy Recommendation
 
-File Structure
+For best results, use residential or mobile proxies. The bot supports:
 
-```
-Humanoid-BOT/
-├── bot.py              # Main bot script
-├── accounts.txt        # Wallet private keys
-├── proxy.txt          # Proxy list (optional)
-└── requirements.txt   # Python dependencies
-```
+· HTTP/HTTPS proxies
+· SOCKS4/SOCKS5 proxies
+· Authenticated proxies
+· Automatic proxy rotation
 
-📝 Notes
+💬 Support
 
-· The bot runs on a 12-hour cycle automatically
-· Each session includes:
-  · Account login
-  · Training submissions (up to daily limits)
-  · Task completion
-  · Points tracking
-· Use proxies to avoid rate limiting and improve success rates
-· Always test with one account first before adding multiple
+For questions or issues:
 
-⚠️ Disclaimer
+1. Check the configuration files are properly formatted
+2. Ensure all dependencies are installed
+3. Verify your private keys are correct
+4. Test proxies individually before adding to the list
 
-This tool is for educational purposes only. Use at your own risk. The developers are not responsible for any account restrictions or losses incurred while using this bot.
+🤝 Contributing
+
+1. ⭐ Star the project if you find it useful
+2. 🐛 Report issues you encounter
+3. 💡 Suggest improvements or new features
+
+---
+
+Note: This bot is for educational purposes. Use at your own risk and always comply with the terms of service of the platforms you interact with.
 
 
