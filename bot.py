@@ -19,7 +19,7 @@ class Humanoid:
     def __init__(self) -> None:
         self.BASE_API = "https://prelaunch.humanoidnetwork.org"
         self.HF_API = "https://huggingface.co"
-        self.REF_CODE = "4FGZC3" # U can change it with yours.
+        self.REF_CODE = "E2YE9U"  # Updated with your referral code
         self.HEADERS = {}
         self.proxies = []
         self.proxy_index = 0
@@ -42,7 +42,7 @@ class Humanoid:
         {Fore.GREEN + Style.BRIGHT}Humanoid {Fore.BLUE + Style.BRIGHT}Auto BOT
             """
             f"""
-        {Fore.GREEN + Style.BRIGHT}Rey? {Fore.YELLOW + Style.BRIGHT}<INI WATERMARK>
+        {Fore.GREEN + Style.BRIGHT}mejri02 {Fore.YELLOW + Style.BRIGHT}
             """
         )
 
