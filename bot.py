@@ -1,17 +1,11 @@
-from aiohttp import (
-    ClientResponseError,
-    ClientSession,
-    ClientTimeout,
-    BasicAuth
-)
-from aiohttp_socks import ProxyConnector
+from curl_cffi import requests
 from fake_useragent import FakeUserAgent
 from eth_account import Account
 from eth_account.messages import encode_defunct
 from eth_utils import to_hex
 from datetime import datetime
 from colorama import *
-import asyncio, random, string, json, re, os, pytz
+import asyncio, random, string, json, os, pytz
 
 wib = pytz.timezone('Asia/Jakarta')
 
@@ -19,59 +13,86 @@ class Humanoid:
     def __init__(self) -> None:
         self.BASE_API = "https://prelaunch.humanoidnetwork.org"
         self.HF_API = "https://huggingface.co"
-        self.REF_CODE = "E2YE9U"  # Updated with your referral code
+        self.REF_CODE = "E2YE9U"
         self.HEADERS = {}
         self.proxies = []
         self.proxy_index = 0
         self.account_proxies = {}
         self.access_tokens = {}
+        self.user_agents = []
 
     def clear_terminal(self):
         os.system('cls' if os.name == 'nt' else 'clear')
 
-    def log(self, message):
+    def log(self, message, color=Fore.WHITE, style=Style.BRIGHT, symbol="●"):
         print(
-            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-            f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}{message}",
-            flush=True
+            f"{Fore.MAGENTA + Style.BRIGHT}║{Style.RESET_ALL}"
+            f"{Fore.CYAN + Style.BRIGHT}[{datetime.now().astimezone(wib).strftime('%H:%M:%S')}]{Style.RESET_ALL}"
+            f"{Fore.MAGENTA + Style.BRIGHT}│{Style.RESET_ALL}"
+            f"{Fore.YELLOW + Style.BRIGHT} {symbol} {Style.RESET_ALL}"
+            f"{color + style}{message}{Style.RESET_ALL}"
         )
 
     def welcome(self):
-        print(
-            f"""
-        {Fore.GREEN + Style.BRIGHT}Humanoid {Fore.BLUE + Style.BRIGHT}Auto BOT
-            """
-            f"""
-        {Fore.GREEN + Style.BRIGHT}mejri02 {Fore.YELLOW + Style.BRIGHT}
-            """
-        )
+        self.clear_terminal()
+        print(f"""
+{Fore.CYAN + Style.BRIGHT}╔══════════════════════════════════════════════════════════════════════════╗
+{Fore.CYAN + Style.BRIGHT}║{Fore.MAGENTA + Style.BRIGHT}   ██╗  ██╗██╗   ██╗███╗   ███╗ █████╗ ███╗   ██╗ ██████╗ ██╗██████╗   {Fore.CYAN + Style.BRIGHT}║
+{Fore.CYAN + Style.BRIGHT}║{Fore.MAGENTA + Style.BRIGHT}   ██║  ██║██║   ██║████╗ ████║██╔══██╗████╗  ██║██╔═══██╗██║██╔══██╗  {Fore.CYAN + Style.BRIGHT}║
+{Fore.CYAN + Style.BRIGHT}║{Fore.MAGENTA + Style.BRIGHT}   ███████║██║   ██║██╔████╔██║███████║██╔██╗ ██║██║   ██║██║██║  ██║  {Fore.CYAN + Style.BRIGHT}║
+{Fore.CYAN + Style.BRIGHT}║{Fore.MAGENTA + Style.BRIGHT}   ██╔══██║██║   ██║██║╚██╔╝██║██╔══██║██║╚██╗██║██║   ██║██║██║  ██║  {Fore.CYAN + Style.BRIGHT}║
+{Fore.CYAN + Style.BRIGHT}║{Fore.MAGENTA + Style.BRIGHT}   ██║  ██║╚██████╔╝██║ ╚═╝ ██║██║  ██║██║ ╚████║╚██████╔╝██║██████╔╝  {Fore.CYAN + Style.BRIGHT}║
+{Fore.CYAN + Style.BRIGHT}║{Fore.MAGENTA + Style.BRIGHT}   ╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝╚═════╝   {Fore.CYAN + Style.BRIGHT}║
+{Fore.CYAN + Style.BRIGHT}╠══════════════════════════════════════════════════════════════════════════╣
+{Fore.CYAN + Style.BRIGHT}║{Fore.GREEN + Style.BRIGHT}                    𝐀𝐔𝐓𝐎𝐌𝐀𝐓𝐈𝐎𝐍 𝐒𝐔𝐈𝐓𝐄  •  𝐌𝐔𝐋𝐓𝐈-𝐀𝐂𝐂𝐎𝐔𝐍𝐓               {Fore.CYAN + Style.BRIGHT}║
+{Fore.CYAN + Style.BRIGHT}╚══════════════════════════════════════════════════════════════════════════╝
+{Fore.YELLOW + Style.BRIGHT}                         [ V2.0 • Enhanced Anti-Detection ]                       
+        """)
 
     def format_seconds(self, seconds):
         hours, remainder = divmod(seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
     
-    async def load_proxies(self):
+    def load_accounts(self):
+        filename = "accounts.txt"
+        try:
+            with open(filename, 'r') as file:
+                accounts = [line.strip() for line in file if line.strip()]
+            self.log(f"Loaded {Fore.GREEN}{len(accounts)}{Fore.WHITE} accounts", Fore.GREEN, symbol="✓")
+            return accounts
+        except Exception as e:
+            self.log(f"Failed To Load Accounts: {e}", Fore.RED, symbol="✗")
+            return None
+
+    def load_proxies(self):
         filename = "proxy.txt"
         try:
             if not os.path.exists(filename):
-                self.log(f"{Fore.RED + Style.BRIGHT}File {filename} Not Found.{Style.RESET_ALL}")
+                self.log(f"File {filename} Not Found", Fore.RED, symbol="✗")
                 return
             with open(filename, 'r') as f:
                 self.proxies = [line.strip() for line in f.read().splitlines() if line.strip()]
             
             if not self.proxies:
-                self.log(f"{Fore.RED + Style.BRIGHT}No Proxies Found.{Style.RESET_ALL}")
+                self.log("No Proxies Found", Fore.YELLOW, symbol="!")
                 return
 
-            self.log(
-                f"{Fore.GREEN + Style.BRIGHT}Proxies Total  : {Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT}{len(self.proxies)}{Style.RESET_ALL}"
-            )
+            self.log(f"Proxies Loaded: {Fore.CYAN}{len(self.proxies)}{Fore.WHITE}", Fore.GREEN, symbol="✓")
         
         except Exception as e:
-            self.log(f"{Fore.RED + Style.BRIGHT}Failed To Load Proxies: {e}{Style.RESET_ALL}")
+            self.log(f"Failed To Load Proxies: {e}", Fore.RED, symbol="✗")
             self.proxies = []
+
+    def generate_user_agents(self, count=50):
+        ua = FakeUserAgent()
+        self.user_agents = [ua.random for _ in range(count)]
+        self.log(f"Generated {Fore.MAGENTA}{len(self.user_agents)}{Fore.WHITE} random user agents", Fore.MAGENTA, symbol="🔄")
+
+    def get_random_user_agent(self):
+        if not self.user_agents:
+            self.generate_user_agents()
+        return random.choice(self.user_agents)
 
     def check_proxy_schemes(self, proxies):
         schemes = ["http://", "https://", "socks4://", "socks5://"]
@@ -96,31 +117,10 @@ class Humanoid:
         self.proxy_index = (self.proxy_index + 1) % len(self.proxies)
         return proxy
     
-    def build_proxy_config(self, proxy=None):
-        if not proxy:
-            return None, None, None
-
-        if proxy.startswith("socks"):
-            connector = ProxyConnector.from_url(proxy)
-            return connector, None, None
-
-        elif proxy.startswith("http"):
-            match = re.match(r"http://(.*?):(.*?)@(.*)", proxy)
-            if match:
-                username, password, host_port = match.groups()
-                clean_url = f"http://{host_port}"
-                auth = BasicAuth(username, password)
-                return None, clean_url, auth
-            else:
-                return None, proxy, None
-
-        raise Exception("Unsupported Proxy Type.")
-        
     def generate_address(self, account: str):
         try:
             account = Account.from_key(account)
             address = account.address
-
             return address
         except Exception as e:
             return None
@@ -160,51 +160,69 @@ class Humanoid:
             return None
 
     def print_question(self):
+        print(f"\n{Fore.CYAN + Style.BRIGHT}╔══════════════════════════════════════════════════════════════════════════╗")
+        print(f"{Fore.CYAN + Style.BRIGHT}║{Fore.YELLOW + Style.BRIGHT}                    𝐂𝐎𝐍𝐅𝐈𝐆𝐔𝐑𝐀𝐓𝐈𝐎𝐍  𝐒𝐄𝐓𝐓𝐈𝐍𝐆𝐒                    {Fore.CYAN + Style.BRIGHT}║")
+        print(f"{Fore.CYAN + Style.BRIGHT}╠══════════════════════════════════════════════════════════════════════════╣")
+        
         while True:
             try:
-                print(f"{Fore.WHITE + Style.BRIGHT}1. Run With Proxy{Style.RESET_ALL}")
-                print(f"{Fore.WHITE + Style.BRIGHT}2. Run Without Proxy{Style.RESET_ALL}")
-                proxy_choice = int(input(f"{Fore.BLUE + Style.BRIGHT}Choose [1/2] -> {Style.RESET_ALL}").strip())
+                print(f"{Fore.CYAN + Style.BRIGHT}║{Fore.WHITE + Style.BRIGHT}  [1] {Fore.GREEN}Run With Proxy Rotation{Fore.WHITE + Style.BRIGHT}                           {Fore.CYAN + Style.BRIGHT}║")
+                print(f"{Fore.CYAN + Style.BRIGHT}║{Fore.WHITE + Style.BRIGHT}  [2] {Fore.YELLOW}Run Without Proxy{Fore.WHITE + Style.BRIGHT}                                   {Fore.CYAN + Style.BRIGHT}║")
+                print(f"{Fore.CYAN + Style.BRIGHT}║{Fore.MAGENTA + Style.BRIGHT}─"*70 + f"{Fore.CYAN + Style.BRIGHT}║")
+                proxy_choice = int(input(f"{Fore.CYAN + Style.BRIGHT}║{Fore.CYAN + Style.BRIGHT}  {Fore.WHITE + Style.BRIGHT}Select Mode {Fore.GREEN}[1/2]{Fore.WHITE + Style.BRIGHT}: {Style.RESET_ALL}").strip())
 
                 if proxy_choice in [1, 2]:
                     proxy_type = (
-                        "With" if proxy_choice == 1 else 
-                        "Without"
+                        f"{Fore.GREEN}With Proxy Rotation" if proxy_choice == 1 else 
+                        f"{Fore.YELLOW}Without Proxy"
                     )
-                    print(f"{Fore.GREEN + Style.BRIGHT}Run {proxy_type} Proxy Selected.{Style.RESET_ALL}")
+                    print(f"{Fore.CYAN + Style.BRIGHT}║{Fore.WHITE + Style.BRIGHT}  Selected: {proxy_type}{Style.RESET_ALL}{' '*(48-len(proxy_type))}{Fore.CYAN + Style.BRIGHT}║")
                     break
                 else:
-                    print(f"{Fore.RED + Style.BRIGHT}Please enter either 1 or 2.{Style.RESET_ALL}")
+                    print(f"{Fore.CYAN + Style.BRIGHT}║{Fore.RED + Style.BRIGHT}  Invalid choice! Please enter 1 or 2.{' '*28}{Fore.CYAN + Style.BRIGHT}║")
             except ValueError:
-                print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter a number (1 or 2).{Style.RESET_ALL}")
+                print(f"{Fore.CYAN + Style.BRIGHT}║{Fore.RED + Style.BRIGHT}  Invalid input! Enter a number (1 or 2).{' '*24}{Fore.CYAN + Style.BRIGHT}║")
 
         rotate_proxy = False
         if proxy_choice == 1:
             while True:
-                rotate_proxy = input(f"{Fore.BLUE + Style.BRIGHT}Rotate Invalid Proxy? [y/n] -> {Style.RESET_ALL}").strip()
+                rotate = input(f"{Fore.CYAN + Style.BRIGHT}║{Fore.WHITE + Style.BRIGHT}  Rotate invalid proxies? {Fore.GREEN}[y/n]{Fore.WHITE + Style.BRIGHT}: {Style.RESET_ALL}").strip().lower()
 
-                if rotate_proxy in ["y", "n"]:
-                    rotate_proxy = rotate_proxy == "y"
+                if rotate in ["y", "n"]:
+                    rotate_proxy = rotate == "y"
+                    status = f"{Fore.GREEN}Enabled" if rotate_proxy else f"{Fore.RED}Disabled"
+                    print(f"{Fore.CYAN + Style.BRIGHT}║{Fore.WHITE + Style.BRIGHT}  Proxy Rotation: {status}{Style.RESET_ALL}{' '*(39)}{Fore.CYAN + Style.BRIGHT}║")
                     break
                 else:
-                    print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter 'y' or 'n'.{Style.RESET_ALL}")
-
-        return proxy_choice, rotate_proxy
+                    print(f"{Fore.CYAN + Style.BRIGHT}║{Fore.RED + Style.BRIGHT}  Invalid! Enter 'y' or 'n'.{' '*38}{Fore.CYAN + Style.BRIGHT}║")
+        
+        delay_choice = input(f"{Fore.CYAN + Style.BRIGHT}║{Fore.WHITE + Style.BRIGHT}  Add random delay between accounts? {Fore.GREEN}[y/n]{Fore.WHITE + Style.BRIGHT}: {Style.RESET_ALL}").strip().lower()
+        random_delay = delay_choice == "y"
+        
+        print(f"{Fore.CYAN + Style.BRIGHT}╚══════════════════════════════════════════════════════════════════════════╝\n")
+        
+        return proxy_choice, rotate_proxy, random_delay
+    
+    def ensure_ok(self, response):
+        if not response.ok:
+            raise Exception(f"HTTP {response.status_code}:{response.text}")
     
     async def check_connection(self, proxy_url=None):
-        connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
+        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
         try:
-            async with ClientSession(connector=connector, timeout=ClientTimeout(total=30)) as session:
-                async with session.get(url="https://api.ipify.org?format=json", proxy=proxy, proxy_auth=proxy_auth) as response:
-                    response.raise_for_status()
-                    return True
-        except (Exception, ClientResponseError) as e:
-            self.log(
-                f"{Fore.CYAN+Style.BRIGHT}Status  :{Style.RESET_ALL}"
-                f"{Fore.RED+Style.BRIGHT} Connection Not 200 OK {Style.RESET_ALL}"
-                f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
+            response = await asyncio.to_thread(
+                requests.get, 
+                url="https://api.ipify.org?format=json", 
+                proxies=proxies, 
+                timeout=30, 
+                impersonate="chrome120"
             )
+            self.ensure_ok(response)
+            ip_data = response.json()
+            self.log(f"Connected via IP: {Fore.CYAN}{ip_data.get('ip', 'Unknown')}", Fore.GREEN, symbol="✓")
+            return True
+        except Exception as e:
+            self.log(f"Connection Failed: {str(e)[:50]}...", Fore.RED, symbol="✗")
         
         return None
     
@@ -216,24 +234,27 @@ class Humanoid:
             "Content-Length": str(len(data)),
             "Content-Type": "application/json"
         }
-        await asyncio.sleep(1)
+        await asyncio.sleep(random.uniform(1.0, 2.5))
         for attempt in range(retries):
-            connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, data=data, proxy=proxy, proxy_auth=proxy_auth) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(
+                    requests.post, 
+                    url=url, 
+                    headers=headers, 
+                    data=data, 
+                    proxies=proxies, 
+                    timeout=120, 
+                    impersonate=random.choice(["chrome120", "chrome110", "edge110", "safari15"])
+                )
+                self.ensure_ok(response)
+                self.log(f"Nonce fetched successfully", Fore.GREEN, symbol="✓")
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                self.log(
-                    f"{Fore.CYAN+Style.BRIGHT}Status  :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Fetch Nonce Failed {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
+                self.log(f"Fetch Nonce Failed: {str(e)[:50]}...", Fore.RED, symbol="✗")
 
         return None
     
@@ -245,24 +266,26 @@ class Humanoid:
             "Content-Length": str(len(data)),
             "Content-Type": "application/json"
         }
-        await asyncio.sleep(1)
+        await asyncio.sleep(random.uniform(1.0, 2.5))
         for attempt in range(retries):
-            connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, data=data, proxy=proxy, proxy_auth=proxy_auth) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(
+                    requests.post, 
+                    url=url, 
+                    headers=headers, 
+                    data=data, 
+                    proxies=proxies, 
+                    timeout=120, 
+                    impersonate=random.choice(["chrome120", "chrome110", "edge110", "safari15"])
+                )
+                self.ensure_ok(response)
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                self.log(
-                    f"{Fore.CYAN+Style.BRIGHT}Status  :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Login Failed {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
+                self.log(f"Login Failed: {str(e)[:50]}...", Fore.RED, symbol="✗")
 
         return None
     
@@ -272,24 +295,25 @@ class Humanoid:
             **self.HEADERS[address],
             "Authorization": f"Bearer {self.access_tokens[address]}"
         }
-        await asyncio.sleep(1)
+        await asyncio.sleep(random.uniform(0.5, 1.5))
         for attempt in range(retries):
-            connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.get(url=url, headers=headers, proxy=proxy, proxy_auth=proxy_auth) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(
+                    requests.get, 
+                    url=url, 
+                    headers=headers, 
+                    proxies=proxies, 
+                    timeout=120, 
+                    impersonate=random.choice(["chrome120", "chrome110", "edge110", "safari15"])
+                )
+                self.ensure_ok(response)
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                self.log(
-                    f"{Fore.CYAN+Style.BRIGHT}Status  :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Failed to fetch user data {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
+                self.log(f"Failed to fetch user data: {str(e)[:50]}...", Fore.RED, symbol="✗")
 
         return None
     
@@ -302,25 +326,30 @@ class Humanoid:
             "Content-Length": str(len(data)),
             "Content-Type": "application/json"
         }
-        await asyncio.sleep(1)
+        await asyncio.sleep(random.uniform(0.5, 1.5))
         for attempt in range(retries):
-            connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, data=data, proxy=proxy, proxy_auth=proxy_auth) as response:
-                        if response.status == 400: return None
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(
+                    requests.post, 
+                    url=url, 
+                    headers=headers, 
+                    data=data, 
+                    proxies=proxies, 
+                    timeout=120, 
+                    impersonate=random.choice(["chrome120", "chrome110", "edge110", "safari15"])
+                )
+                if response.status_code == 400: 
+                    self.log(f"Referral already applied", Fore.YELLOW, symbol="!")
+                    return None
+                self.ensure_ok(response)
+                self.log(f"Referral applied successfully", Fore.GREEN, symbol="✓")
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                self.log(
-                    f"{Fore.CYAN+Style.BRIGHT}Status  :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Apply Ref Failed {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
+                self.log(f"Apply Ref Failed: {str(e)[:50]}...", Fore.RED, symbol="✗")
 
         return None
     
@@ -330,47 +359,51 @@ class Humanoid:
             **self.HEADERS[address],
             "Authorization": f"Bearer {self.access_tokens[address]}"
         }
-        await asyncio.sleep(1)
+        await asyncio.sleep(random.uniform(0.5, 1.5))
         for attempt in range(retries):
-            connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.get(url=url, headers=headers, proxy=proxy, proxy_auth=proxy_auth) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(
+                    requests.get, 
+                    url=url, 
+                    headers=headers, 
+                    proxies=proxies, 
+                    timeout=120, 
+                    impersonate=random.choice(["chrome120", "chrome110", "edge110", "safari15"])
+                )
+                self.ensure_ok(response)
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                self.log(
-                    f"{Fore.CYAN+Style.BRIGHT}Training:{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Failed to fetch progress data {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
+                self.log(f"Failed to fetch progress data: {str(e)[:50]}...", Fore.RED, symbol="✗")
 
         return None
     
     async def scrape_huggingface(self, endpoint: str, limit: int, proxy_url=None, retries=5):
         url = f"{self.HF_API}/api/{endpoint}"
         params = {"limit": limit, "sort": "lastModified", "direction": -1}
+        await asyncio.sleep(random.uniform(0.5, 1.5))
         for attempt in range(retries):
-            connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.get(url=url, params=params, proxy=proxy, proxy_auth=proxy_auth) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(
+                    requests.get, 
+                    url=url, 
+                    params=params, 
+                    proxies=proxies, 
+                    timeout=120, 
+                    impersonate=random.choice(["chrome120", "chrome110", "edge110", "safari15"])
+                )
+                self.ensure_ok(response)
+                self.log(f"Scraped {Fore.CYAN}{limit}{Fore.WHITE} {endpoint} from HuggingFace", Fore.GREEN, symbol="✓")
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                self.log(
-                    f"{Fore.BLUE+Style.BRIGHT}   Status :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Failed to scrape {endpoint} data from huggingface {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
+                self.log(f"Failed to scrape {endpoint} data: {str(e)[:50]}...", Fore.RED, symbol="✗")
 
         return None
     
@@ -383,24 +416,26 @@ class Humanoid:
             "Content-Length": str(len(data)),
             "Content-Type": "application/json"
         }
-        await asyncio.sleep(1)
+        await asyncio.sleep(random.uniform(1.0, 2.5))
         for attempt in range(retries):
-            connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, data=data, proxy=proxy, proxy_auth=proxy_auth) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(
+                    requests.post, 
+                    url=url, 
+                    headers=headers, 
+                    data=data, 
+                    proxies=proxies, 
+                    timeout=120, 
+                    impersonate=random.choice(["chrome120", "chrome110", "edge110", "safari15"])
+                )
+                self.ensure_ok(response)
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                self.log(
-                    f"{Fore.BLUE+Style.BRIGHT}   Status :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Submit Failed {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
+                self.log(f"Submit Failed: {str(e)[:50]}...", Fore.RED, symbol="✗")
 
         return None
     
@@ -410,24 +445,25 @@ class Humanoid:
             **self.HEADERS[address],
             "Authorization": f"Bearer {self.access_tokens[address]}"
         }
-        await asyncio.sleep(1)
+        await asyncio.sleep(random.uniform(0.5, 1.5))
         for attempt in range(retries):
-            connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.get(url=url, headers=headers, proxy=proxy, proxy_auth=proxy_auth) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(
+                    requests.get, 
+                    url=url, 
+                    headers=headers, 
+                    proxies=proxies, 
+                    timeout=120, 
+                    impersonate=random.choice(["chrome120", "chrome110", "edge110", "safari15"])
+                )
+                self.ensure_ok(response)
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                self.log(
-                    f"{Fore.CYAN+Style.BRIGHT}Tasks   :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Failed to fetch tasks data {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
+                self.log(f"Failed to fetch tasks data: {str(e)[:50]}...", Fore.RED, symbol="✗")
 
         return None
     
@@ -440,54 +476,48 @@ class Humanoid:
             "Content-Length": str(len(data)),
             "Content-Type": "application/json"
         }
-        await asyncio.sleep(1)
+        await asyncio.sleep(random.uniform(1.0, 2.5))
         for attempt in range(retries):
-            connector, proxy, proxy_auth = self.build_proxy_config(proxy_url)
+            proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
             try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, data=data, proxy=proxy, proxy_auth=proxy_auth) as response:
-                        if response.status == 400:
-                            self.log(
-                                f"{Fore.GREEN+Style.BRIGHT} ● {Style.RESET_ALL}"
-                                f"{Fore.WHITE+Style.BRIGHT}{title}{Style.RESET_ALL}"
-                                f"{Fore.YELLOW+Style.BRIGHT} Already Completed {Style.RESET_ALL}"
-                            )
-                            return False
-                        
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                response = await asyncio.to_thread(
+                    requests.post, 
+                    url=url, 
+                    headers=headers, 
+                    data=data, 
+                    proxies=proxies, 
+                    timeout=120, 
+                    impersonate=random.choice(["chrome120", "chrome110", "edge110", "safari15"])
+                )
+                if response.status_code == 400:
+                    self.log(f"{title}: Already Completed", Fore.YELLOW, symbol="!")
+                    return False
+                self.ensure_ok(response)
+                return response.json()
+            except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-                self.log(
-                    f"{Fore.GREEN+Style.BRIGHT} ● {Style.RESET_ALL}"
-                    f"{Fore.WHITE+Style.BRIGHT}{title}{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Not Completed {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
+                self.log(f"{title}: Not Completed - {str(e)[:50]}...", Fore.RED, symbol="✗")
 
         return None
     
     async def process_check_connection(self, address: str, use_proxy: bool, rotate_proxy: bool):
         while True:
             proxy = self.get_next_proxy_for_account(address) if use_proxy else None
-            self.log(
-                f"{Fore.CYAN+Style.BRIGHT}Proxy   :{Style.RESET_ALL}"
-                f"{Fore.WHITE+Style.BRIGHT} {proxy} {Style.RESET_ALL}"
-            )
+            if proxy:
+                self.log(f"Using Proxy: {Fore.CYAN}{proxy[:50]}...", Fore.BLUE, symbol="🌐")
 
             is_valid = await self.check_connection(proxy)
-            if not is_valid:
-                if rotate_proxy:
-                    proxy = self.rotate_proxy_for_account(address)
-                    await asyncio.sleep(1)
-                    continue
+            if is_valid: return True
 
-                return False
+            if rotate_proxy:
+                proxy = self.rotate_proxy_for_account(address)
+                self.log(f"Rotating to new proxy...", Fore.YELLOW, symbol="🔄")
+                await asyncio.sleep(2)
+                continue
 
-            return True
+            return False
     
     async def process_auth_login(self, account: str, address: str, use_proxy: bool, rotate_proxy: bool):
         is_valid = await self.process_check_connection(address, use_proxy, rotate_proxy)
@@ -504,13 +534,14 @@ class Humanoid:
             
             self.access_tokens[address] = authenticate.get("token")
 
-            self.log(
-                f"{Fore.CYAN + Style.BRIGHT}Status  :{Style.RESET_ALL}"
-                f"{Fore.GREEN + Style.BRIGHT} Login Success {Style.RESET_ALL}"
-            )
+            self.log(f"Login Successful", Fore.GREEN, symbol="🔓")
             return True
 
     async def process_accounts(self, account: str, address: str, use_proxy: bool, rotate_proxy: bool):
+        print(f"\n{Fore.CYAN + Style.BRIGHT}╔══════════════════════════════════════════════════════════════════════════╗")
+        self.log(f"Processing Account: {Fore.MAGENTA}{self.mask_account(address)}", Fore.CYAN, symbol="👤")
+        print(f"{Fore.CYAN + Style.BRIGHT}╠══════════════════════════════════════════════════════════════════════════╣")
+        
         logined = await self.process_auth_login(account, address, use_proxy, rotate_proxy)
         if logined:
             proxy = self.get_next_proxy_for_account(address) if use_proxy else None
@@ -525,26 +556,20 @@ class Humanoid:
             if refer_by is None:
                 await self.apply_ref(address, proxy)
 
-            self.log(
-                f"{Fore.CYAN + Style.BRIGHT}Points  :{Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT} {total_points} {Style.RESET_ALL}"
-            )
+            self.log(f"Account Points: {Fore.YELLOW}{total_points}", Fore.WHITE, symbol="⭐")
 
             progress = await self.training_progress(address, proxy)
             if progress:
-                self.log(f"{Fore.CYAN+Style.BRIGHT}Training:{Style.RESET_ALL}")
+                self.log(f"Training Progress", Fore.CYAN, symbol="📊")
 
                 models_completed = progress.get("daily", {}).get("models", {}).get("completed")
                 models_limit = progress.get("daily", {}).get("models", {}).get("limit")
                 models_remaining = progress.get("daily", {}).get("models", {}).get("remaining")
 
-                self.log(f"{Fore.GREEN+Style.BRIGHT} ● {Style.RESET_ALL}"
-                    f"{Fore.WHITE+Style.BRIGHT}Models{Style.RESET_ALL}"
-                )
+                self.log(f"Models: {Fore.GREEN}{models_completed}{Fore.WHITE}/{Fore.CYAN}{models_limit}", Fore.WHITE, symbol="🤖")
                 if models_remaining > 0:
                     models = await self.scrape_huggingface("models", models_remaining, proxy)
                     if models:
-
                         for model in models:
                             model_name = model["id"]
                             model_url = f"{self.HF_API}/{model['id']}"
@@ -556,46 +581,23 @@ class Humanoid:
                                 "recaptchaToken": ""
                             }
 
-                            self.log(
-                                f"{Fore.BLUE+Style.BRIGHT}   ==={Style.RESET_ALL}"
-                                f"{Fore.WHITE+Style.BRIGHT} {models_completed+1} Of {models_limit} {Style.RESET_ALL}"
-                                f"{Fore.BLUE+Style.BRIGHT}==={Style.RESET_ALL}"
-                            )
+                            self.log(f"Submitting Model {Fore.CYAN}{models_completed+1}{Fore.WHITE} of {Fore.CYAN}{models_limit}", Fore.BLUE, symbol="⬆️")
 
                             submit = await self.submit_training(address, training_data, proxy)
                             if submit:
-                                self.log(
-                                    f"{Fore.BLUE+Style.BRIGHT}   Status :{Style.RESET_ALL}"
-                                    f"{Fore.GREEN+Style.BRIGHT} Model Submited Successfully {Style.RESET_ALL}"
-                                )
-                                self.log(
-                                    f"{Fore.BLUE+Style.BRIGHT}   Name   :{Style.RESET_ALL}"
-                                    f"{Fore.WHITE+Style.BRIGHT} {model_name} {Style.RESET_ALL}"
-                                )
-                                self.log(
-                                    f"{Fore.BLUE+Style.BRIGHT}   URL    :{Style.RESET_ALL}"
-                                    f"{Fore.WHITE+Style.BRIGHT} {model_url} {Style.RESET_ALL}"
-                                )
-
+                                self.log(f"Model Submitted: {Fore.GREEN}{model_name[:30]}...", Fore.GREEN, symbol="✓")
                             models_completed+=1
-
                 else:
-                    self.log(
-                        f"{Fore.BLUE+Style.BRIGHT}   Status :{Style.RESET_ALL}"
-                        f"{Fore.YELLOW+Style.BRIGHT} Daily Limit Reached [{models_completed}/{models_limit}] {Style.RESET_ALL}"
-                    )
+                    self.log(f"Models: Daily Limit Reached", Fore.YELLOW, symbol="⏸️")
 
                 datasets_completed = progress.get("daily", {}).get("datasets", {}).get("completed")
                 datasets_limit = progress.get("daily", {}).get("datasets", {}).get("limit")
                 datasets_remaining = progress.get("daily", {}).get("datasets", {}).get("remaining")
 
-                self.log(f"{Fore.GREEN+Style.BRIGHT} ● {Style.RESET_ALL}"
-                    f"{Fore.WHITE+Style.BRIGHT}Datasets{Style.RESET_ALL}"
-                )
+                self.log(f"Datasets: {Fore.GREEN}{datasets_completed}{Fore.WHITE}/{Fore.CYAN}{datasets_limit}", Fore.WHITE, symbol="📁")
                 if datasets_remaining > 0:
                     datasets = await self.scrape_huggingface("datasets", datasets_remaining, proxy)
                     if datasets:
-
                         for dataset in datasets:
                             dataset_name = dataset["id"]
                             dataset_url = f"{self.HF_API}/datasets/{dataset['id']}"
@@ -607,39 +609,18 @@ class Humanoid:
                                 "recaptchaToken": ""
                             }
 
-                            self.log(
-                                f"{Fore.BLUE+Style.BRIGHT}   ==={Style.RESET_ALL}"
-                                f"{Fore.WHITE+Style.BRIGHT} {datasets_completed+1} Of {datasets_limit} {Style.RESET_ALL}"
-                                f"{Fore.BLUE+Style.BRIGHT}==={Style.RESET_ALL}"
-                            )
+                            self.log(f"Submitting Dataset {Fore.CYAN}{datasets_completed+1}{Fore.WHITE} of {Fore.CYAN}{datasets_limit}", Fore.BLUE, symbol="⬆️")
 
                             submit = await self.submit_training(address, training_data, proxy)
                             if submit:
-                                self.log(
-                                    f"{Fore.BLUE+Style.BRIGHT}   Status :{Style.RESET_ALL}"
-                                    f"{Fore.GREEN+Style.BRIGHT} Dataset Submited Successfully {Style.RESET_ALL}"
-                                )
-                                self.log(
-                                    f"{Fore.BLUE+Style.BRIGHT}   Name   :{Style.RESET_ALL}"
-                                    f"{Fore.WHITE+Style.BRIGHT} {dataset_name} {Style.RESET_ALL}"
-                                )
-                                self.log(
-                                    f"{Fore.BLUE+Style.BRIGHT}   URL    :{Style.RESET_ALL}"
-                                    f"{Fore.WHITE+Style.BRIGHT} {dataset_url} {Style.RESET_ALL}"
-                                )
-
+                                self.log(f"Dataset Submitted: {Fore.GREEN}{dataset_name[:30]}...", Fore.GREEN, symbol="✓")
                             datasets_completed+=1
-
                 else:
-                    self.log(
-                        f"{Fore.BLUE+Style.BRIGHT}   Status :{Style.RESET_ALL}"
-                        f"{Fore.YELLOW+Style.BRIGHT} Daily Limit Reached [{datasets_completed}/{datasets_limit}] {Style.RESET_ALL}"
-                    )
+                    self.log(f"Datasets: Daily Limit Reached", Fore.YELLOW, symbol="⏸️")
 
             tasks = await self.task_lists(address, proxy)
             if tasks:
-                self.log(f"{Fore.CYAN+Style.BRIGHT}Tasks   :{Style.RESET_ALL}")
-
+                self.log(f"Available Tasks", Fore.CYAN, symbol="📋")
                 for task in tasks:
                     task_id = task.get("id")
                     title = task.get("title")
@@ -652,88 +633,70 @@ class Humanoid:
 
                     complete = await self.complete_task(address, task_id, title, recurements, proxy)
                     if complete:
-                        self.log(
-                            f"{Fore.GREEN+Style.BRIGHT} ● {Style.RESET_ALL}"
-                            f"{Fore.WHITE+Style.BRIGHT}{title}{Style.RESET_ALL}"
-                            f"{Fore.GREEN+Style.BRIGHT} Completed {Style.RESET_ALL}"
-                            f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                            f"{Fore.CYAN+Style.BRIGHT} Reward: {Style.RESET_ALL}"
-                            f"{Fore.WHITE+Style.BRIGHT}{reward} Points{Style.RESET_ALL}"
-                        )
+                        self.log(f"{title}: Completed +{Fore.YELLOW}{reward}{Fore.WHITE} points", Fore.GREEN, symbol="✅")
             
+            print(f"{Fore.CYAN + Style.BRIGHT}╚══════════════════════════════════════════════════════════════════════════╝")
+    
     async def main(self):
         try:
-            with open('accounts.txt', 'r') as file:
-                accounts = [line.strip() for line in file if line.strip()]
+            self.generate_user_agents()
+            accounts = self.load_accounts()
+            if not accounts: return
 
-            proxy_choice, rotate_proxy = self.print_question()
+            proxy_choice, rotate_proxy, random_delay = self.print_question()
 
             while True:
-                self.clear_terminal()
                 self.welcome()
-                self.log(
-                    f"{Fore.GREEN + Style.BRIGHT}Account's Total: {Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT}{len(accounts)}{Style.RESET_ALL}"
-                )
+                self.log(f"Total Accounts: {Fore.CYAN}{len(accounts)}", Fore.WHITE, symbol="📊")
 
                 use_proxy = True if proxy_choice == 1 else False
-                if use_proxy:
-                    await self.load_proxies()
+                if use_proxy: self.load_proxies()
 
-                separator = "=" * 25
                 for idx, account in enumerate(accounts, start=1):
                     if account:
                         address = self.generate_address(account)
-                        self.log(
-                            f"{Fore.CYAN + Style.BRIGHT}{separator}[{Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT} {idx} {Style.RESET_ALL}"
-                            f"{Fore.CYAN + Style.BRIGHT}-{Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT} {self.mask_account(address)} {Style.RESET_ALL}"
-                            f"{Fore.CYAN + Style.BRIGHT}]{separator}{Style.RESET_ALL}"
-                        )
-
+                        
                         if not address:
-                            self.log(
-                                f"{Fore.CYAN + Style.BRIGHT}Status  :{Style.RESET_ALL}"
-                                f"{Fore.RED + Style.BRIGHT} Invalid Private Key or Library Version Not Supported {Style.RESET_ALL}"
-                            )
+                            self.log(f"Invalid Private Key", Fore.RED, symbol="⚠️")
                             continue
 
                         self.HEADERS[address] = {
                             "Accept": "*/*",
+                            "Accept-Encoding": "gzip, deflate, br",
                             "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+                            "Cache-Control": "no-cache",
                             "Origin": "https://prelaunch.humanoidnetwork.org",
+                            "Pragma": "no-cache",
                             "Referer": "https://prelaunch.humanoidnetwork.org/",
                             "Sec-Fetch-Dest": "empty",
                             "Sec-Fetch-Mode": "cors",
                             "Sec-Fetch-Site": "same-origin",
-                            "User-Agent": FakeUserAgent().random
+                            "User-Agent": self.get_random_user_agent()
                         }
                         
                         await self.process_accounts(account, address, use_proxy, rotate_proxy)
+                        
+                        if random_delay and idx < len(accounts):
+                            delay = random.uniform(3.0, 8.0)
+                            self.log(f"Delaying for {Fore.YELLOW}{delay:.1f}s{Fore.WHITE} before next account...", Fore.BLUE, symbol="⏳")
+                            await asyncio.sleep(delay)
 
-                self.log(f"{Fore.CYAN + Style.BRIGHT}={Style.RESET_ALL}"*72)
+                self.log(f"Cycle Completed - All accounts processed", Fore.GREEN, symbol="🎉")
                 
-                delay = 12 * 60 * 60
+                delay = 24 * 60 * 60
                 while delay > 0:
                     formatted_time = self.format_seconds(delay)
                     print(
-                        f"{Fore.CYAN+Style.BRIGHT}[ Wait for{Style.RESET_ALL}"
-                        f"{Fore.WHITE+Style.BRIGHT} {formatted_time} {Style.RESET_ALL}"
-                        f"{Fore.CYAN+Style.BRIGHT}... ]{Style.RESET_ALL}"
-                        f"{Fore.WHITE+Style.BRIGHT} | {Style.RESET_ALL}"
-                        f"{Fore.BLUE+Style.BRIGHT}All Accounts Have Been Processed...{Style.RESET_ALL}",
+                        f"{Fore.CYAN + Style.BRIGHT}[{Fore.MAGENTA}⏰{Fore.CYAN}] Next cycle in {Fore.GREEN}{formatted_time}{Fore.CYAN}...{' '*20}",
                         end="\r",
                         flush=True
                     )
                     await asyncio.sleep(1)
                     delay -= 1
+                print()
 
-        except FileNotFoundError:
-            self.log(f"{Fore.RED}File 'accounts.txt' Not Found.{Style.RESET_ALL}")
-            return
         except Exception as e:
-            self.log(f"{Fore.RED+Style.BRIGHT}Error: {e}{Style.RESET_ALL}")
+            self.log(f"Unexpected Error: {str(e)[:100]}", Fore.RED, symbol="💥")
             raise e
 
 if __name__ == "__main__":
@@ -741,8 +704,4 @@ if __name__ == "__main__":
         bot = Humanoid()
         asyncio.run(bot.main())
     except KeyboardInterrupt:
-        print(
-            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-            f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-            f"{Fore.RED + Style.BRIGHT}[ EXIT ] Humanoid - BOT{Style.RESET_ALL}                                       "                              
-        )
+        print(f"\n\n{Fore.CYAN + Style.BRIGHT}[{Fore.RED}✗{Fore.CYAN}] {Fore.YELLOW}Bot terminated by user{Style.RESET_ALL}")
