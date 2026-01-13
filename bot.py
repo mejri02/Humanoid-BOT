@@ -8,7 +8,7 @@ from colorama import *
 import asyncio, random, string, json, os, pytz
 
 init(autoreset=True)
-wib = pytz.timezone('Asia/Jakarta')
+wib = pytz.timezone('Africa/Tunis')
 
 class Humanoid:
     def __init__(self) -> None:
