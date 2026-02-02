@@ -4,7 +4,7 @@ from eth_account.messages import encode_defunct
 from eth_utils import to_hex
 from datetime import datetime
 from colorama import *
-import asyncio, random, string, json, os, pytz
+import asyncio, random, string, json, os, pytz, socket
 import time, hashlib
 
 init(autoreset=True)
@@ -119,18 +119,46 @@ class Humanoid:
                 self.log(f"No Proxies Found.", "ERROR")
                 return
 
-            self.log(f"Proxies Total: {len(self.proxies)}", "INFO")
+            working_proxies = []
+            for proxy in self.proxies:
+                if self.test_dns_resolution(proxy):
+                    working_proxies.append(proxy)
+                else:
+                    self.log(f"DNS resolution failed for proxy: {proxy}", "WARN")
+            
+            self.proxies = working_proxies
+            self.log(f"Working Proxies: {len(self.proxies)}", "INFO")
+            
+            if not self.proxies:
+                self.log("No working proxies found.", "WARN")
         
         except Exception as e:
             self.log(f"Failed To Load Proxies: {e}", "ERROR")
             self.proxies = []
 
-    def check_proxy_schemes(self, proxies):
-        schemes = ["http://", "https://", "socks4://", "socks5://"]
-        if any(proxies.startswith(scheme) for scheme in schemes):
-            return proxies
-        return f"http://{proxies}"
+    def test_dns_resolution(self, proxy_url):
+        try:
+            import re
+            match = re.search(r'@([^:/]+)', proxy_url)
+            if not match:
+                return False
+            hostname = match.group(1)
+            socket.gethostbyname(hostname)
+            return True
+        except socket.gaierror:
+            return False
+        except Exception:
+            return False
 
+    def check_proxy_schemes(self, proxy_str):
+        schemes = ["http://", "https://", "socks4://", "socks5://", "socks4a://", "socks5h://"]
+        proxy_str = proxy_str.strip()
+        has_scheme = any(proxy_str.lower().startswith(scheme) for scheme in schemes)
+        if has_scheme:
+            return proxy_str
+        else:
+            return f"http://{proxy_str}"
+    
     def get_next_proxy_for_account(self, account):
         if account not in self.account_proxies:
             if not self.proxies:
@@ -189,7 +217,6 @@ class Humanoid:
     def get_headers(self, address: str):
         if address not in self.HEADERS:
             session_id = self.generate_session_id(address)
-            
             self.HEADERS[address] = {
                 "Accept": "application/json, text/plain, */*",
                 "Accept-Encoding": "gzip, deflate, br",
@@ -209,21 +236,17 @@ class Humanoid:
                 "X-Session-ID": session_id,
                 "X-Client-Timestamp": str(int(time.time() * 1000))
             }
-            
         return self.HEADERS[address]
     
     def get_session(self, address: str, proxy_url=None, timeout=60):
         if address not in self.sessions:
             proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
-
             session = AsyncSession(
                 proxies=proxies,
                 timeout=timeout, 
                 impersonate="chrome120"
             )
-            
             self.sessions[address] = session
-        
         return self.sessions[address]
     
     async def close_session(self, address: str):
@@ -241,11 +264,9 @@ class Humanoid:
         print(f"{Fore.CYAN}[1]{Fore.WHITE} Run With Proxy")
         print(f"{Fore.CYAN}[2]{Fore.WHITE} Run Without Proxy")
         choice = input(f"{Fore.YELLOW}Select Option > {Style.RESET_ALL}")
-        
         rotate = 'n'
         if choice == '1':
             rotate = input(f"{Fore.YELLOW}Rotate proxy on error? (y/n) > {Style.RESET_ALL}")
-        
         return int(choice), rotate.lower() == 'y'
 
     def ensure_ok(self, response):
@@ -258,17 +279,29 @@ class Humanoid:
             session = self.get_session(address, proxy_url, 15)
             response = await session.get(url=url)
             self.ensure_ok(response)
+            data = response.json()
+            self.log(f"Connection successful. IP: {data.get('ip', 'Unknown')}", "SUCCESS")
             return True
         except Exception as e:
-            self.log(f"Connection Not 200 OK - {str(e)}", "ERROR")
-        
+            error_msg = str(e)
+            if "Could not resolve host" in error_msg:
+                if proxy_url:
+                    import re
+                    match = re.search(r'@([^:/]+)', proxy_url)
+                    hostname = match.group(1) if match else "Unknown"
+                    self.log(f"DNS Resolution Failed for proxy host: {hostname}", "ERROR")
+                else:
+                    self.log(f"DNS Resolution Failed - No proxy", "ERROR")
+            elif "Connection refused" in error_msg or "timed out" in error_msg:
+                self.log(f"Proxy Connection Failed - {error_msg}", "ERROR")
+            else:
+                self.log(f"Connection Failed - {error_msg}", "ERROR")
         return None
     
     async def auth_nonce(self, address: str, proxy_url=None, retries=5):
         url = f"{self.BASE_API}/api/auth/nonce"
         payload = {"walletAddress": address}
         headers = self.get_headers(address)
-
         await self.human_delay(address, 0.5, 1.5)
         for attempt in range(retries):
             try:
@@ -281,14 +314,12 @@ class Humanoid:
                     await asyncio.sleep(5)
                     continue
                 self.log(f"Fetch Nonce Failed - {str(e)}", "ERROR")
-
         return None
     
     async def auth_authenticate(self, account: str, address: str, message: str, proxy_url=None, retries=5):
         url = f"{self.BASE_API}/api/auth/authenticate"
         payload = self.generate_payload(account, address, message)
         headers = self.get_headers(address)
-
         await self.human_delay(address, 0.5, 1.5)
         for attempt in range(retries):
             try:
@@ -301,14 +332,12 @@ class Humanoid:
                     await asyncio.sleep(5)
                     continue
                 self.log(f"Login Failed - {str(e)}", "ERROR")
-
         return None
     
     async def user_data(self, address: str, proxy_url=None, retries=5):
         url = f"{self.BASE_API}/api/user"
         headers = self.get_headers(address)
         headers["Authorization"] = f"Bearer {self.access_tokens[address]}"
-        
         await self.human_delay(address, 0.5, 1.5)
         for attempt in range(retries):
             try:
@@ -321,7 +350,6 @@ class Humanoid:
                     await asyncio.sleep(5)
                     continue
                 self.log(f"Failed to fetch user data - {str(e)}", "ERROR")
-
         return None
     
     async def apply_ref(self, address: str, proxy_url=None, retries=5):
@@ -329,7 +357,6 @@ class Humanoid:
         payload = {"referralCode": self.REF_CODE}
         headers = self.get_headers(address)
         headers["Authorization"] = f"Bearer {self.access_tokens[address]}"
-        
         await self.human_delay(address, 0.5, 1.5)
         for attempt in range(retries):
             try:
@@ -342,14 +369,12 @@ class Humanoid:
                     await asyncio.sleep(5)
                     continue
                 self.log(f"Apply Ref Failed - {str(e)}", "ERROR")
-
         return None
     
     async def training_progress(self, address: str, proxy_url=None, retries=5):
         url = f"{self.BASE_API}/api/training/progress"
         headers = self.get_headers(address)
         headers["Authorization"] = f"Bearer {self.access_tokens[address]}"
-        
         await self.human_delay(address, 0.5, 1.5)
         for attempt in range(retries):
             try:
@@ -362,7 +387,6 @@ class Humanoid:
                     await asyncio.sleep(5)
                     continue
                 self.log(f"Failed to fetch progress data - {str(e)}", "ERROR")
-
         return None
     
     async def scrape_huggingface(self, address: str, endpoint: str, limit: int, proxy_url=None, retries=5):
@@ -372,14 +396,12 @@ class Humanoid:
             url = f"{self.HF_API}/api/datasets"
         else:
             return None
-        
         params = {
             "limit": limit,
             "sort": "lastModified",
             "direction": -1,
             "filter": ""
         }
-
         await asyncio.sleep(random.uniform(1, 2))
         for attempt in range(retries):
             try:
@@ -387,7 +409,6 @@ class Humanoid:
                 response = await session.get(url=url, params=params)
                 self.ensure_ok(response)
                 data = response.json()
-                
                 if isinstance(data, list):
                     return data
                 elif isinstance(data, dict) and endpoint in data:
@@ -399,26 +420,22 @@ class Humanoid:
                 else:
                     self.log(f"Invalid response format for {endpoint}", "WARN")
                     return None
-                    
             except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
                 self.log(f"Failed to scrape {endpoint} data - {str(e)}", "ERROR")
-
         return None
     
     async def submit_training(self, address: str, training_data: dict, proxy_url=None, retries=5):
         url = f"{self.BASE_API}/api/training"
         headers = self.get_headers(address)
         headers["Authorization"] = f"Bearer {self.access_tokens[address]}"
-        
         await self.human_delay(address, 0.5, 1.5)
         for attempt in range(retries):
             try:
                 session = self.get_session(address, proxy_url)
                 response = await session.post(url=url, headers=headers, json=training_data)
-                
                 if response.status_code == 400:
                     try:
                         result = response.json()
@@ -429,26 +446,21 @@ class Humanoid:
                     except:
                         self.log(f"Submit Failed - HTTP {response.status_code}", "ERROR")
                     return None
-                
                 if not response.ok:
                     self.log(f"Submit Failed - HTTP {response.status_code}: {response.text[:100]}", "ERROR")
                     return None
-                    
                 return response.json()
-                
             except Exception as e:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
                 self.log(f"Submit Failed - {str(e)}", "ERROR")
-
         return None
     
     async def task_lists(self, address: str, proxy_url=None, retries=5):
         url = f"{self.BASE_API}/api/tasks"
         headers = self.get_headers(address)
         headers["Authorization"] = f"Bearer {self.access_tokens[address]}"
-        
         await self.human_delay(address, 0.5, 1.5)
         for attempt in range(retries):
             try:
@@ -461,7 +473,6 @@ class Humanoid:
                     await asyncio.sleep(5)
                     continue
                 self.log(f"Failed to fetch tasks data - {str(e)}", "ERROR")
-
         return None
     
     async def complete_task(self, address: str, task_id: str, title: str, recurements: dict, proxy_url=None, retries=5):
@@ -469,7 +480,6 @@ class Humanoid:
         payload = {"taskId": task_id,"data": recurements}
         headers = self.get_headers(address)
         headers["Authorization"] = f"Bearer {self.access_tokens[address]}"
-        
         await self.human_delay(address, 0.5, 1.5)
         for attempt in range(retries):
             try:
@@ -485,161 +495,127 @@ class Humanoid:
                     await asyncio.sleep(5)
                     continue
                 self.log(f"Task '{title}' Not Completed - {str(e)}", "ERROR")
-
         return None
     
     async def process_check_connection(self, address: str, use_proxy: bool, rotate_proxy: bool):
-        while True:
+        max_attempts = 3 if rotate_proxy else 1
+        attempts = 0
+        while attempts < max_attempts:
             proxy = self.get_next_proxy_for_account(address) if use_proxy else None
             if use_proxy and proxy:
                 self.log(f"Proxy: {proxy}", "PROXY")
-
             is_valid = await self.check_connection(address, proxy)
             if is_valid: return True
-
-            if rotate_proxy:
+            attempts += 1
+            if rotate_proxy and attempts < max_attempts:
                 proxy = self.rotate_proxy_for_account(address)
-                await asyncio.sleep(1)
+                await asyncio.sleep(2)
                 continue
-
             return False
     
     async def process_auth_login(self, account: str, address: str, use_proxy: bool, rotate_proxy: bool):
         is_valid = await self.process_check_connection(address, use_proxy, rotate_proxy)
         if is_valid:
             proxy = self.get_next_proxy_for_account(address) if use_proxy else None
-
             nonce = await self.auth_nonce(address, proxy)
             if not nonce: return False
-
             message = nonce.get("message")
-
             authenticate = await self.auth_authenticate(account, address, message, proxy)
             if not authenticate: return False
-            
             self.access_tokens[address] = authenticate.get("token")
-
             self.log("Login Success", "SUCCESS")
             return True
 
     async def process_accounts(self, account: str, address: str, use_proxy: bool, rotate_proxy: bool, idx: int):
         print(f"\n{Fore.MAGENTA}{'='*60}")
         self.log(f"Account #{idx} | Wallet: {address[:6]}...{address[-4:]}", "INFO")
-        
         logined = await self.process_auth_login(account, address, use_proxy, rotate_proxy)
         if logined:
             proxy = self.get_next_proxy_for_account(address) if use_proxy else None
-
             user = await self.user_data(address, proxy)
             if not user: return False
-
             refer_by = user.get("user", {}).get("referredBy", None)
             x_handle = user.get("user", {}).get("twitterId", None)
             total_points = user.get("totalPoints")
-
             if refer_by is None:
                 await self.apply_ref(address, proxy)
-
             self.log(f"Current Points: {Fore.YELLOW}{total_points}", "INFO")
-
             progress = await self.training_progress(address, proxy)
             if progress:
                 self.log(f"Processing Training Tasks", "TASK")
-
                 models_completed = progress.get("daily", {}).get("models", {}).get("completed")
                 models_limit = progress.get("daily", {}).get("models", {}).get("limit")
                 models_remaining = progress.get("daily", {}).get("models", {}).get("remaining")
-
                 if models_remaining > 0:
                     models = await self.scrape_huggingface(address, "models", models_remaining, proxy)
                     if models:
                         for model in models:
                             if not isinstance(model, dict):
                                 continue
-                                
                             model_name = model.get("id")
                             if not model_name:
                                 continue
-                                
                             model_url = f"https://huggingface.co/{model_name}"
                             is_private = model.get("private", False)
                             gated = model.get("gated", False)
-
                             if is_private or gated:
                                 continue
-
                             training_data = {
                                 "fileName": model_name,
                                 "fileUrl": model_url,
                                 "fileType": "model",
                                 "recaptchaToken": ""
                             }
-
                             self.log(f"Uploading model: {model_name[:30]}...", "INFO")
-
                             submit = await self.submit_training(address, training_data, proxy)
                             if submit:
                                 self.log(f"Model Submitted Successfully", "SUCCESS")
                                 models_completed += 1
                                 await asyncio.sleep(random.uniform(2, 4))
-
                 else:
                     self.log(f"Daily models limit reached [{models_completed}/{models_limit}]", "WARN")
-
                 datasets_completed = progress.get("daily", {}).get("datasets", {}).get("completed")
                 datasets_limit = progress.get("daily", {}).get("datasets", {}).get("limit")
                 datasets_remaining = progress.get("daily", {}).get("datasets", {}).get("remaining")
-
                 if datasets_remaining > 0:
                     datasets = await self.scrape_huggingface(address, "datasets", datasets_remaining, proxy)
                     if datasets:
                         for dataset in datasets:
                             if not isinstance(dataset, dict):
                                 continue
-                                
                             dataset_name = dataset.get("id")
                             if not dataset_name:
                                 continue
-                                
                             dataset_url = f"https://huggingface.co/datasets/{dataset_name}"
                             is_private = dataset.get("private", False)
                             gated = dataset.get("gated", False)
-
                             if is_private or gated:
                                 continue
-
                             training_data = {
                                 "fileName": dataset_name,
                                 "fileUrl": dataset_url,
                                 "fileType": "dataset",
                                 "recaptchaToken": ""
                             }
-
                             self.log(f"Uploading dataset: {dataset_name[:30]}...", "INFO")
-
                             submit = await self.submit_training(address, training_data, proxy)
                             if submit:
                                 self.log(f"Dataset Submitted Successfully", "SUCCESS")
                                 datasets_completed += 1
                                 await asyncio.sleep(random.uniform(2, 4))
-
                 else:
                     self.log(f"Daily datasets limit reached [{datasets_completed}/{datasets_limit}]", "WARN")
-
             tasks = await self.task_lists(address, proxy)
             if tasks:
                 self.log(f"Processing Daily Tasks", "TASK")
-
                 for task in tasks:
                     task_id = task.get("id")
                     title = task.get("title")
                     type = task.get("type")
                     recurements = task.get("requirements")
                     reward = task.get("points")
-
                     if type == "SOCIAL_TWEET":
                         recurements = self.generate_tweet_id(x_handle)
-
                     if recurements:
                         complete = await self.complete_task(address, task_id, title, recurements, proxy)
                         if complete:
@@ -650,34 +626,28 @@ class Humanoid:
         try:
             accounts = self.load_accounts()
             if not accounts: return
-
             proxy_choice, rotate_proxy = self.print_question()
-
             self.welcome()
             self.log(f"Total Accounts: {len(accounts)}", "INFO")
-
             use_proxy = True if proxy_choice == 1 else False
-            if use_proxy: self.load_proxies()
-
+            if use_proxy: 
+                self.load_proxies()
+                if not self.proxies:
+                    self.log("No working proxies found. Switching to no-proxy mode.", "WARN")
+                    use_proxy = False
             processed_count = 0
-            
             for idx, account in enumerate(accounts, start=1):
                 if account:
                     address = self.generate_address(account)
-                    
                     if not address:
                         self.log(f"Invalid Private Key (Idx: {idx})", "ERROR")
                         continue
-                    
                     await self.process_accounts(account, address, use_proxy, rotate_proxy, idx)
                     processed_count += 1
                     await asyncio.sleep(random.uniform(5, 10))
-
             await self.close_all_sessions()
-
             print(f"\n{Fore.CYAN}{'='*60}")
             self.log(f"Processing complete. Success: {processed_count}", "INFO")
-            
             if processed_count > 0:
                 self.log("Entering 24h hibernation...", "INFO")
                 delay = 24 * 60 * 60
@@ -688,7 +658,6 @@ class Humanoid:
             else:
                 self.log("No accounts processed successfully. Check your accounts/proxies.", "ERROR")
                 input("Press Enter to exit...")
-
         except Exception as e:
             self.log(f"Error: {e}", "ERROR")
             raise e
